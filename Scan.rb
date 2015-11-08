@@ -24,6 +24,20 @@ end
 
 dir = ARGV[0]
 results = {}
-scan(dir, results, depth: 2)
+scan(dir, results, depth: 10)
 
-puts results
+unique = []
+unique_size = 0
+duplicates = []
+duplicated_size = 0
+results.each do |k, v|
+  unique << v[0]
+  unique_size += File.size(v[0])
+  if (v.length > 1)
+    duplicates << v[0]
+    duplicated_size += File.size(v[0]) * (v.length-1)
+  end
+end
+
+puts "#{unique.length} unique files, #{unique_size} bytes"
+puts "#{duplicates.length} duplicated files, #{duplicated_size} bytes"
