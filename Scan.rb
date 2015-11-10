@@ -19,31 +19,30 @@ class Entry
     return s
   end
 
-  def build
+  def build(ignore: [], depth: 1000)
   end
 end
 
 class FileEntry < Entry
+  attr_accessor :size
   def initialize(dir)
     super(dir)
+    @size = File.size(path)
   end
 
   def key
     base = File.basename(path)
     return "#{base}_#{File.size(path)}"
   end
-
-  def size
-    return File.size(path)
-  end
 end
 
 class DirectoryEntry < Entry
-  attr_accessor :entries
+  attr_accessor :entries, :size
 
   def initialize(dir)
     super(dir)
     @entries = []
+    @size = 0
   end
 
   def key
@@ -51,15 +50,14 @@ class DirectoryEntry < Entry
     Digest::MD5.hexdigest(str)
   end
 
-  def size
-    if (@entries.size == 0)
-      return 0
+  def build(ignore: [], depth: 1000)
+    b = File.basename(path)
+    if (ignore.include?(b))
+      STDERR.puts "skipping #{path}"
+      return
     end
-    return @entries.map{ |e| e.size }.inject{ |sum,x| sum + x }
-  end
-
-  def build(depth: 1000)
     STDERR.puts "building #{path}"
+
     Dir["#{path}/*"].each do |f|
       if (!File.directory?(f))
         @entries << FileEntry.new(f)
@@ -69,7 +67,8 @@ class DirectoryEntry < Entry
     end
 
     @entries.each do |e|
-      e.build
+      e.build(ignore: ignore, depth: depth-1)
+      @size += e.size
     end
   end
 
@@ -124,7 +123,7 @@ class Repository
     if (total_size != 0)
       dup_pct = ((duplicated_size(obj).to_f / total_size) * 100).round
     end
-    extra = "#{obj.size} bytes, duplication #{dup_pct}%"
+    extra = "#{obj.size} bytes, duplication #{dup_pct}% #{obj.key}"
     if (entry.duplicates.length == 1)
       return "unique, #{extra}", true
     end
@@ -135,11 +134,11 @@ class Repository
     total = 0
     if (obj.entries.length > 0)
       total += obj.entries.map { |e| duplicated_size(e) }.inject{ |sum,x| sum + x }
-    end
-
-    entry = contents[obj.key]
-    if (entry.duplicates.length != 1)
-      total += obj.size
+    else
+      entry = contents[obj.key]
+      if (entry.duplicates.length != 1)
+        total += obj.size
+      end
     end
     return total
   end
@@ -163,11 +162,13 @@ results = {}
 dir_results = {}
 
 d = DirectoryEntry.new(dir)
-d.build
+d.build()
+STDERR.puts "Visit complete"
 
 r = Repository.new(d)
 
 s = d.format do |e|
+  STDERR.puts "Formatting #{e.path}"
   s, unique = r.stats(e)
   next "#{e.name} (#{s})", unique, e.kind_of?(DirectoryEntry)
 end
