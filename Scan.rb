@@ -1,4 +1,7 @@
 require 'digest'
+require 'ruby-prof'
+
+RubyProf.start
 
 class Entry
   attr_reader :path, :entries
@@ -173,6 +176,12 @@ s = d.format do |e|
   next "#{e.name} (#{s})", unique, e.kind_of?(DirectoryEntry)
 end
 puts s
+
+result = RubyProf.stop
+
+# Print a flat profile to text
+printer = RubyProf::FlatPrinter.new(result)
+printer.print(STDOUT)
 
 =begin
 scan(dir, results, dir_results, depth: 10)
